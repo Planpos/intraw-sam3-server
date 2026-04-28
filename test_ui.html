@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>SAM3 객체 분석 테스트</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; }
+    h1 { margin-bottom: 24px; color: #1a1a2e; }
+    .card { background: white; border-radius: 12px; padding: 24px; width: 100%; max-width: 800px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); margin-bottom: 24px; }
+    .row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap; }
+    label { font-size: 13px; color: #555; margin-bottom: 4px; display: block; }
+    input[type="file"] { border: 2px dashed #ccc; padding: 12px; border-radius: 8px; cursor: pointer; flex: 1; min-width: 200px; }
+    input[type="text"], input[type="number"] { border: 1px solid #ccc; padding: 8px 12px; border-radius: 8px; font-size: 14px; width: 100%; }
+    .field { flex: 1; min-width: 150px; }
+    button { background: #4f46e5; color: white; border: none; padding: 10px 24px; border-radius: 8px; font-size: 15px; cursor: pointer; white-space: nowrap; }
+    button:hover { background: #4338ca; }
+    button:disabled { background: #a5b4fc; cursor: not-allowed; }
+    #status { font-size: 14px; color: #666; min-height: 20px; }
+    #canvas-wrap { position: relative; display: inline-block; }
+    canvas { border-radius: 8px; max-width: 100%; display: block; }
+    #info { font-size: 13px; color: #444; margin-top: 12px; }
+    .badge { display: inline-block; background: #e0e7ff; color: #4f46e5; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin: 2px; }
+  </style>
+</head>
+<body>
+  <h1>SAM3 객체 분석 테스트</h1>
+
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label>이미지 파일</label>
+        <input type="file" id="imageInput" accept="image/*">
+      </div>
+      <div class="field">
+        <label>프롬프트 <span style="font-size:11px;color:#888">(비워두면 자동으로 모든 객체 탐지)</span></label>
+        <input type="text" id="prompt" value="" placeholder="비워두면 자동 탐지 / 특정 객체: person, car, dog ...">
+      </div>
+      <div class="field" style="max-width:130px">
+        <label>신뢰도 임계값</label>
+        <input type="number" id="threshold" value="0.3" min="0.1" max="1.0" step="0.05">
+      </div>
+      <button id="analyzeBtn" onclick="analyze()">객체 분석</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <div id="canvas-wrap">
+      <canvas id="canvas"></canvas>
+    </div>
+    <div id="info"></div>
+  </div>
+
+  <script>
+    const SERVER = 'http://localhost:8001';
+    const COLORS = [
+      [255,99,132],[54,162,235],[255,206,86],[75,192,192],
+      [153,102,255],[255,159,64],[199,199,199],[83,102,255],
+      [255,99,255],[99,255,132],[255,200,100],[100,200,255],
+    ];
+
+    async function analyze() {
+      const fileInput = document.getElementById('imageInput');
+      const prompt = document.getElementById('prompt').value || 'object';
+      const threshold = document.getElementById('threshold').value;
+      const btn = document.getElementById('analyzeBtn');
+      const status = document.getElementById('status');
+
+      if (!fileInput.files[0]) { alert('이미지를 선택해주세요.'); return; }
+
+      btn.disabled = true;
+      status.textContent = '분석 중...';
+
+      const formData = new FormData();
+      formData.append('image', fileInput.files[0]);
+      formData.append('prompt', prompt);
+      formData.append('confidence_threshold', threshold);
+
+      try {
+        const res = await fetch(`${SERVER}/analyze`, { method: 'POST', body: formData });
+        if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
+        const data = await res.json();
+
+        await drawResult(fileInput.files[0], data);
+        status.textContent = `완료! ${data.num_detections}개 객체 감지됨`;
+      } catch (e) {
+        status.textContent = `오류: ${e.message}`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function drawResult(file, data) {
+      const img = await loadImage(file);
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = data.image_width;
+      canvas.height = data.image_height;
+
+      ctx.drawImage(img, 0, 0);
+
+      // 마스크 + 박스 그리기
+      for (let i = 0; i < data.detections.length; i++) {
+        const det = data.detections[i];
+        const color = COLORS[i % COLORS.length];
+
+        // 마스크 오버레이
+        const maskImg = await loadBase64Image(det.mask_base64);
+        const offscreen = document.createElement('canvas');
+        offscreen.width = data.image_width;
+        offscreen.height = data.image_height;
+        const octx = offscreen.getContext('2d');
+        octx.drawImage(maskImg, 0, 0);
+        const pixels = octx.getImageData(0, 0, data.image_width, data.image_height);
+        for (let p = 0; p < pixels.data.length; p += 4) {
+          if (pixels.data[p] > 128) {
+            pixels.data[p]   = color[0];
+            pixels.data[p+1] = color[1];
+            pixels.data[p+2] = color[2];
+            pixels.data[p+3] = 100;
+          } else {
+            pixels.data[p+3] = 0;
+          }
+        }
+        octx.putImageData(pixels, 0, 0);
+        ctx.drawImage(offscreen, 0, 0);
+
+        // 바운딩 박스
+        const {x1, y1, x2, y2} = det.box;
+        ctx.strokeStyle = `rgb(${color.join(',')})`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x1, y1, x2-x1, y2-y1);
+
+        // 라벨
+        const label = det.label ? `${det.label} ${(det.score * 100).toFixed(0)}%` : `#${det.id} ${(det.score * 100).toFixed(0)}%`;
+        const labelW = ctx.measureText(label).width + 10;
+        ctx.fillStyle = `rgb(${color.join(',')})`;
+        ctx.fillRect(x1, y1 - 20, labelW, 20);
+        ctx.fillStyle = 'white';
+        ctx.font = '13px sans-serif';
+        ctx.fillText(label, x1 + 4, y1 - 5);
+      }
+
+      // 정보 표시
+      const info = document.getElementById('info');
+      info.innerHTML = `<b>프롬프트:</b> "${data.prompt}" &nbsp;|&nbsp; <b>감지 수:</b> ${data.num_detections}개<br><br>`;
+      data.detections.forEach((d, i) => {
+        const c = COLORS[i % COLORS.length];
+        const name = d.label || `#${d.id}`;
+        info.innerHTML += `<span class="badge" style="background:rgba(${c},0.15);color:rgb(${c})">${name} ${(d.score*100).toFixed(1)}%</span>`;
+      });
+
+      document.getElementById('resultCard').style.display = 'block';
+    }
+
+    function loadImage(file) {
+      return new Promise(resolve => {
+        const img = new window.Image();
+        img.onload = () => resolve(img);
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    function loadBase64Image(b64) {
+      return new Promise(resolve => {
+        const img = new window.Image();
+        img.onload = () => resolve(img);
+        img.src = 'data:image/png;base64,' + b64;
+      });
+    }
+  </script>
+</body>
+</html>

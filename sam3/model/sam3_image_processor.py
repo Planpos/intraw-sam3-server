@@ -39,6 +39,7 @@ class Sam3Processor:
         )
 
     @torch.inference_mode()
+    @torch.autocast(device_type="cuda", dtype=torch.bfloat16)
     def set_image(self, image, state=None):
         """Sets the image on which we want to do predictions."""
         if state is None:
@@ -110,6 +111,7 @@ class Sam3Processor:
         return state
 
     @torch.inference_mode()
+    @torch.autocast(device_type="cuda", dtype=torch.bfloat16)
     def set_text_prompt(self, prompt: str, state: Dict):
         """Sets the text prompt and run the inference"""
 
@@ -180,6 +182,7 @@ class Sam3Processor:
         return state
 
     @torch.inference_mode()
+    @torch.autocast(device_type="cuda", dtype=torch.bfloat16)
     def _forward_grounding(self, state: Dict):
         outputs = self.model.forward_grounding(
             backbone_out=state["backbone_out"],
