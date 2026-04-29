@@ -24,7 +24,7 @@ AUTO_CATEGORIES = [
     "backpack", "bag", "suitcase", "umbrella", "hat",
     "book", "clock", "vase", "plant", "flower",
     "door", "window", "wall", "floor", "ceiling",
-    "ball", "bat", "racket",
+    "ball", "bat", "racket","outer wall",
     "pizza", "cake", "sandwich", "apple", "banana",
 ]
 
