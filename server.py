@@ -24,7 +24,7 @@ AUTO_CATEGORIES = [
     "backpack", "bag", "suitcase", "umbrella", "hat",
     "book", "clock", "vase", "plant", "flower",
     "door", "window", "wall", "floor", "ceiling",
-    "ball", "bat", "racket","outer wall",
+    "ball", "bat", "racket","outer wall","carpet",
     "pizza", "cake", "sandwich", "apple", "banana",
 ]
 
@@ -41,7 +41,7 @@ LABEL_KO = {
     "umbrella": "우산", "hat": "모자",
     "book": "책", "clock": "시계", "vase": "꽃병", "plant": "식물", "flower": "꽃",
     "door": "문", "window": "창문", "wall": "벽", "floor": "바닥", "ceiling": "천장",
-    "ball": "공", "bat": "배트", "racket": "라켓",
+    "ball": "공", "bat": "배트", "racket": "라켓", "outer wall": "외벽", "carpet": "카펫",
     "pizza": "피자", "cake": "케이크", "sandwich": "샌드위치",
     "apple": "사과", "banana": "바나나",
 }
@@ -95,7 +95,7 @@ def box_iou(box1, box2):
 
 
 def nms_detections(detections, iou_threshold=0.5):
-    """중복 박스 제거 (NMS)"""
+    """중복 박스 제거 (NMS) - 같은 레이블 내에서만 적용"""
     if not detections:
         return []
     detections = sorted(detections, key=lambda x: x["score"], reverse=True)
@@ -103,6 +103,7 @@ def nms_detections(detections, iou_threshold=0.5):
     for det in detections:
         b1 = [det["box"]["x1"], det["box"]["y1"], det["box"]["x2"], det["box"]["y2"]]
         overlap = any(
+            k["label"] == det["label"] and
             box_iou(b1, [k["box"]["x1"], k["box"]["y1"], k["box"]["x2"], k["box"]["y2"]]) > iou_threshold
             for k in kept
         )

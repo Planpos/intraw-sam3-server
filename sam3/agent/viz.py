@@ -58,7 +58,7 @@ def visualize(
             boarder_width_multiplier=boarder_width_multiplier,
         )
         viz.overlay_instances(
-            boxes=boxes,
+            boxes=None,
             masks=rle_masks,
             binary_masks=binary_masks,
             assigned_colors=None,
@@ -106,7 +106,7 @@ def visualize(
             boarder_width_multiplier=boarder_width_multiplier,
         )
         viz_i.overlay_instances(
-            boxes=boxes_i,
+            boxes=None,
             masks=[rle_i],
             binary_masks=[bin_i],
             assigned_colors=[color_hex],
