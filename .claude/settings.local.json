@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(winget install *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(cloudflared tunnel *)"
+    ]
+  }
+}
