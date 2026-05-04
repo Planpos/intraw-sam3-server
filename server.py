@@ -94,8 +94,8 @@ def box_iou(box1, box2):
     return inter / union if union > 0 else 0
 
 
-def nms_detections(detections, iou_threshold=0.5):
-    """중복 박스 제거 (NMS) - 같은 레이블 내에서만 적용"""
+def nms_detections(detections, iou_threshold=0.2):
+    """중복 박스 제거 (NMS)"""
     if not detections:
         return []
     detections = sorted(detections, key=lambda x: x["score"], reverse=True)
@@ -150,7 +150,7 @@ def health():
 async def analyze(
     image: UploadFile = File(...),
     prompt: str = Form(default=""),
-    confidence_threshold: float = Form(default=0.4),
+    confidence_threshold: float = Form(default=0.2),
 ):
     if processor is None:
         raise HTTPException(status_code=503, detail="모델 로딩 중입니다.")
@@ -174,7 +174,7 @@ async def analyze(
             for category in AUTO_CATEGORIES:
                 dets = run_inference_with_state(base_state, category, confidence_threshold)
                 all_detections.extend(dets)
-            detections = nms_detections(all_detections, iou_threshold=0.5)
+            detections = nms_detections(all_detections, iou_threshold=0.2)
             logger.info(f"NMS 전 {len(all_detections)}개 → NMS 후 {len(detections)}개")
             used_prompt = "auto"
         else:
