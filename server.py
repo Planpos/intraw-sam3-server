@@ -282,6 +282,68 @@ async def segment_by_point(
     }
 
 
+@app.post("/segment-by-box")
+async def segment_by_box(
+    image: UploadFile = File(...),
+    x1: float = Form(...),
+    y1: float = Form(...),
+    x2: float = Form(...),
+    y2: float = Form(...),
+):
+    if interactive_predictor is None or processor is None:
+        raise HTTPException(status_code=503, detail="모델 로딩 중입니다.")
+
+    try:
+        contents = await image.read()
+        pil_image = Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"이미지 파일 오류: {e}")
+
+    orig_w, orig_h = pil_image.size
+    logger.info(f"박스 세그멘테이션: box=({x1},{y1},{x2},{y2})")
+
+    try:
+        state = processor.set_image(pil_image)
+        _setup_interactive_predictor(state, orig_h, orig_w)
+
+        box = np.array([x1, y1, x2, y2], dtype=np.float32)
+        masks, iou_scores, _ = interactive_predictor.predict(
+            box=box,
+            multimask_output=False,
+        )
+
+        best_idx = int(np.argmax(iou_scores))
+        best_mask = clean_mask(masks[best_idx].astype(bool))
+        best_score = float(iou_scores[best_idx])
+        logger.info(f"박스 세그멘테이션 score={best_score:.3f} area={best_mask.sum()}")
+
+        rows = np.where(np.any(best_mask, axis=1))[0]
+        cols = np.where(np.any(best_mask, axis=0))[0]
+        if len(rows) and len(cols):
+            ry1, ry2, rx1, rx2 = int(rows[0]), int(rows[-1]), int(cols[0]), int(cols[-1])
+        else:
+            ry1, ry2, rx1, rx2 = 0, orig_h, 0, orig_w
+
+        detections = [{
+            "id": 0,
+            "score": round(best_score, 4),
+            "box": {"x1": rx1, "y1": ry1, "x2": rx2, "y2": ry2},
+            "mask_base64": mask_to_base64(best_mask),
+        }]
+
+    except Exception as e:
+        logger.exception("박스 세그멘테이션 오류")
+        raise HTTPException(status_code=500, detail=f"추론 오류: {e}")
+
+    return {
+        "image_width": orig_w,
+        "image_height": orig_h,
+        "box": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
+        "num_detections": 1,
+        "detections": detections,
+    }
+
+
 @app.post("/analyze")
 async def analyze(
     image: UploadFile = File(...),

@@ -12,14 +12,13 @@
       background: #111;
       color: #e0e0e0;
       padding: 24px;
-      min-height: 100vh;
     }
 
     h1 { font-size: 20px; font-weight: 600; margin-bottom: 18px; color: #fff; }
 
     .controls {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       align-items: center;
       margin-bottom: 18px;
       flex-wrap: wrap;
@@ -34,23 +33,29 @@
       font-weight: 500;
       transition: background 0.15s;
     }
-    .btn-primary { background: #2563eb; color: #fff; }
-    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary  { background: #2563eb; color: #fff; }
+    .btn-primary:hover  { background: #1d4ed8; }
     .btn-secondary { background: #374151; color: #e0e0e0; }
     .btn-secondary:hover { background: #4b5563; }
     .btn:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
 
-    input[type="file"] { display: none; }
-
-    .threshold-wrap {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
+    /* 모드 토글 */
+    .mode-group { display: flex; border-radius: 7px; overflow: hidden; border: 1px solid #374151; }
+    .mode-btn {
+      padding: 7px 16px;
+      border: none;
+      background: #1f2937;
       color: #9ca3af;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s;
     }
-    input[type="range"] { width: 100px; accent-color: #2563eb; }
-    #threshold-val { color: #60a5fa; font-weight: 600; min-width: 28px; }
+    .mode-btn:first-child { border-right: 1px solid #374151; }
+    .mode-btn.active { background: #2563eb; color: #fff; }
+    .mode-btn:hover:not(.active) { background: #374151; color: #e0e0e0; }
+
+    input[type="file"] { display: none; }
 
     .canvas-area {
       position: relative;
@@ -58,14 +63,12 @@
       border: 1px solid #2d2d2d;
       border-radius: 8px;
       overflow: hidden;
-      cursor: crosshair;
       background: #000;
     }
 
-    #main-canvas { display: block; max-width: min(900px, calc(100vw - 48px)); }
+    #main-canvas   { display: block; max-width: min(900px, calc(100vw - 48px)); }
     #overlay-canvas {
-      position: absolute;
-      top: 0; left: 0;
+      position: absolute; top: 0; left: 0;
       pointer-events: none;
       max-width: min(900px, calc(100vw - 48px));
     }
@@ -84,17 +87,11 @@
       cursor: pointer;
       border: 2px dashed #2d2d2d;
       border-radius: 8px;
-      transition: border-color 0.2s;
     }
     #upload-hint:hover { border-color: #4b5563; }
     #upload-hint svg { opacity: 0.4; }
 
-    #status {
-      margin-top: 12px;
-      font-size: 13px;
-      color: #6b7280;
-      height: 18px;
-    }
+    #status { margin-top: 12px; font-size: 13px; color: #6b7280; min-height: 18px; }
 
     .info-panel {
       margin-top: 14px;
@@ -108,58 +105,49 @@
     }
     .info-title { font-weight: 600; color: #d1d5db; margin-bottom: 10px; }
     .det-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 0;
-      border-bottom: 1px solid #252525;
-      font-size: 12px;
-      color: #9ca3af;
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 0; border-bottom: 1px solid #252525;
+      font-size: 12px; color: #9ca3af;
     }
     .det-row:last-child { border-bottom: none; }
     .swatch { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
     .score-val { color: #34d399; font-weight: 600; }
-    .box-val { color: #94a3b8; }
+    .box-val   { color: #94a3b8; }
 
     .spinner {
-      display: inline-block;
-      width: 14px; height: 14px;
-      border: 2px solid #374151;
-      border-top-color: #2563eb;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid #374151; border-top-color: #2563eb;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      vertical-align: middle; margin-right: 6px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-<h1>SAM3 Point Segmentation Demo</h1>
+<h1>SAM3 Segmentation Demo</h1>
 
 <div class="controls">
   <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">이미지 업로드</button>
   <input type="file" id="file-input" accept="image/*">
-  <button class="btn btn-secondary" id="clear-btn" disabled onclick="clearOverlay()">초기화</button>
-  <div class="threshold-wrap">
-    신뢰도:
-    <input type="range" id="threshold" min="0.05" max="0.5" step="0.05" value="0.1"
-           oninput="document.getElementById('threshold-val').textContent = this.value">
-    <span id="threshold-val">0.1</span>
+
+  <div class="mode-group">
+    <button class="mode-btn active" id="btn-point" onclick="setMode('point')">클릭</button>
+    <button class="mode-btn"        id="btn-box"   onclick="setMode('box')">드래그</button>
   </div>
+
+  <button class="btn btn-secondary" id="clear-btn" disabled onclick="clearOverlay()">초기화</button>
 </div>
 
-<!-- 이미지 업로드 전 힌트 영역 -->
 <div id="upload-hint" onclick="document.getElementById('file-input').click()">
   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <circle cx="8.5" cy="8.5" r="1.5"/>
     <polyline points="21 15 16 10 5 21"/>
   </svg>
   클릭해서 이미지를 업로드하세요
 </div>
 
-<!-- 이미지 + 오버레이 캔버스 -->
 <div class="canvas-area" id="canvas-area" style="display:none">
   <canvas id="main-canvas"></canvas>
   <canvas id="overlay-canvas"></canvas>
@@ -177,14 +165,7 @@
     [129, 199, 132],
     [255, 213,  79],
     [186, 104, 200],
-    [255, 171,  64],
-    [77,  182, 172],
   ];
-
-  let originalFile = null;
-  let imgW = 0, imgH = 0;
-  let lastPx = null, lastPy = null;
-  let isLoading = false;
 
   const mainCanvas    = document.getElementById('main-canvas');
   const overlayCanvas = document.getElementById('overlay-canvas');
@@ -193,7 +174,16 @@
   const canvasArea    = document.getElementById('canvas-area');
   const uploadHint    = document.getElementById('upload-hint');
 
-  // 파일 선택
+  let originalFile = null;
+  let imgW = 0, imgH = 0;
+  let isLoading = false;
+  let mode = 'point'; // 'point' | 'box'
+
+  // 드래그 상태
+  let isDragging = false;
+  let dragStart  = null; // { px, py } 원본 픽셀 좌표
+
+  // ── 이미지 업로드 ──────────────────────────────────────────────
   document.getElementById('file-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -202,114 +192,200 @@
     img.onload = () => {
       imgW = img.naturalWidth;
       imgH = img.naturalHeight;
-
       mainCanvas.width    = imgW;
       mainCanvas.height   = imgH;
       overlayCanvas.width = imgW;
       overlayCanvas.height = imgH;
-
       mainCtx.drawImage(img, 0, 0);
       overlayCtx.clearRect(0, 0, imgW, imgH);
-
       uploadHint.style.display = 'none';
       canvasArea.style.display = 'inline-block';
       document.getElementById('clear-btn').disabled = false;
       document.getElementById('info-panel').style.display = 'none';
-      setStatus('이미지를 클릭해서 객체를 선택하세요.');
-      lastPx = lastPy = null;
+      setStatus('객체를 클릭하거나 드래그하세요.');
     };
     img.src = URL.createObjectURL(file);
   });
 
-  // 캔버스 클릭
-  mainCanvas.addEventListener('click', async (e) => {
-    if (!originalFile || isLoading) return;
+  // ── 모드 전환 ──────────────────────────────────────────────────
+  function setMode(m) {
+    mode = m;
+    document.getElementById('btn-point').classList.toggle('active', m === 'point');
+    document.getElementById('btn-box').classList.toggle('active', m === 'box');
+    updateCursor();
+  }
 
+  function updateCursor() {
+    mainCanvas.style.cursor = isLoading ? 'wait' : 'crosshair';
+  }
+
+  // ── 좌표 변환 (CSS → 원본 픽셀) ───────────────────────────────
+  function getPixelCoords(e) {
     const rect = mainCanvas.getBoundingClientRect();
-    const scaleX = imgW / rect.width;
-    const scaleY = imgH / rect.height;
-    lastPx = Math.round((e.clientX - rect.left) * scaleX);
-    lastPy = Math.round((e.clientY - rect.top)  * scaleY);
+    return {
+      px: Math.round((e.clientX - rect.left)  * (imgW / rect.width)),
+      py: Math.round((e.clientY - rect.top)   * (imgH / rect.height)),
+    };
+  }
 
-    await runSegment(lastPx, lastPy);
+  // ── 마우스 이벤트 ──────────────────────────────────────────────
+
+  // 클릭 (포인트 모드)
+  mainCanvas.addEventListener('click', async (e) => {
+    if (!originalFile || isLoading || mode !== 'point' || isDragging) return;
+    const { px, py } = getPixelCoords(e);
+    await runPoint(px, py);
   });
 
-  async function runSegment(px, py) {
-    isLoading = true;
-    setStatus(`<span class="spinner"></span>(${px}, ${py}) 분석 중...`, true);
-    mainCanvas.style.cursor = 'wait';
+  // 드래그 시작 (박스 모드)
+  mainCanvas.addEventListener('mousedown', (e) => {
+    if (!originalFile || isLoading || mode !== 'box') return;
+    isDragging = true;
+    dragStart  = getPixelCoords(e);
+  });
 
-    const threshold = parseFloat(document.getElementById('threshold').value);
+  // 드래그 중 — 박스 프리뷰
+  mainCanvas.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const { px, py } = getPixelCoords(e);
+    overlayCtx.clearRect(0, 0, imgW, imgH);
+
+    const x = Math.min(dragStart.px, px);
+    const y = Math.min(dragStart.py, py);
+    const w = Math.abs(px - dragStart.px);
+    const h = Math.abs(py - dragStart.py);
+
+    // 반투명 채우기
+    overlayCtx.fillStyle = 'rgba(37,99,235,0.12)';
+    overlayCtx.fillRect(x, y, w, h);
+    // 테두리
+    overlayCtx.strokeStyle = 'rgba(96,165,250,0.9)';
+    overlayCtx.lineWidth   = Math.max(1.5, imgW / 600);
+    overlayCtx.setLineDash([Math.max(6, imgW / 150), Math.max(3, imgW / 300)]);
+    overlayCtx.strokeRect(x, y, w, h);
+    overlayCtx.setLineDash([]);
+    // 시작점 점
+    drawDot(dragStart.px, dragStart.py, 'rgba(96,165,250,0.9)');
+  });
+
+  // 드래그 끝
+  mainCanvas.addEventListener('mouseup', async (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    const { px, py } = getPixelCoords(e);
+    const x1 = Math.min(dragStart.px, px);
+    const y1 = Math.min(dragStart.py, py);
+    const x2 = Math.max(dragStart.px, px);
+    const y2 = Math.max(dragStart.py, py);
+
+    // 너무 작은 드래그 무시 (5px 이하)
+    if (x2 - x1 < 5 || y2 - y1 < 5) {
+      overlayCtx.clearRect(0, 0, imgW, imgH);
+      return;
+    }
+    await runBox(x1, y1, x2, y2);
+  });
+
+  // 캔버스 밖으로 나갔을 때 드래그 취소
+  mainCanvas.addEventListener('mouseleave', () => {
+    if (isDragging) {
+      isDragging = false;
+      overlayCtx.clearRect(0, 0, imgW, imgH);
+    }
+  });
+
+  // ── API 호출 ──────────────────────────────────────────────────
+
+  async function runPoint(px, py) {
+    setLoading(true);
+    setStatus(`(${px}, ${py}) 분석 중...`, true);
+
     const fd = new FormData();
     fd.append('image', originalFile);
     fd.append('x', px);
     fd.append('y', py);
-    fd.append('confidence_threshold', threshold);
 
+    const data = await callAPI('/segment-by-point', fd);
+    if (data) await renderResult(data, 'point', { px, py });
+    setLoading(false);
+  }
+
+  async function runBox(x1, y1, x2, y2) {
+    setLoading(true);
+    setStatus(`박스 (${x1},${y1}) → (${x2},${y2}) 분석 중...`, true);
+
+    const fd = new FormData();
+    fd.append('image', originalFile);
+    fd.append('x1', x1); fd.append('y1', y1);
+    fd.append('x2', x2); fd.append('y2', y2);
+
+    const data = await callAPI('/segment-by-box', fd);
+    if (data) await renderResult(data, 'box', { x1, y1, x2, y2 });
+    setLoading(false);
+  }
+
+  async function callAPI(path, fd) {
     try {
-      const res = await fetch(`${API}/segment-by-point`, { method: 'POST', body: fd });
+      const res = await fetch(API + path, { method: 'POST', body: fd });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         setStatus(`오류: ${err.detail}`);
-        return;
+        return null;
       }
-      const data = await res.json();
-      await renderResult(data, px, py);
+      return await res.json();
     } catch (err) {
       setStatus(`서버 연결 실패: ${err.message}`);
-    } finally {
-      isLoading = false;
-      mainCanvas.style.cursor = 'crosshair';
+      return null;
     }
   }
 
-  async function renderResult(data, px, py) {
+  // ── 결과 렌더링 ───────────────────────────────────────────────
+
+  async function renderResult(data, inputType, coords) {
     overlayCtx.clearRect(0, 0, imgW, imgH);
 
     if (data.num_detections === 0) {
-      setStatus(`(${px}, ${py}) — 객체를 찾지 못했습니다. 신뢰도 임계값을 낮춰보세요.`);
+      setStatus('객체를 찾지 못했습니다.');
       document.getElementById('info-panel').style.display = 'none';
-      drawClickDot(px, py);
+      if (inputType === 'point') drawDot(coords.px, coords.py, 'rgba(239,68,68,0.9)');
       return;
     }
 
-    // 마스크 → 박스 순서로 순차 렌더링
     for (let i = 0; i < data.detections.length; i++) {
       const det   = data.detections[i];
       const color = COLORS[i % COLORS.length];
       await drawMask(det.mask_base64, color);
-      drawBox(det.box, color);
     }
 
-    drawClickDot(px, py);
-    setStatus(`(${px}, ${py}) — ${data.num_detections}개 감지`);
+    // 입력 힌트 표시
+    if (inputType === 'point') {
+      drawDot(coords.px, coords.py, 'rgba(239,68,68,0.9)');
+      setStatus(`(${coords.px}, ${coords.py}) — ${data.num_detections}개 감지`);
+    } else {
+      setStatus(`박스 드래그 — ${data.num_detections}개 감지`);
+    }
+
     renderInfoPanel(data);
   }
+
+  // ── 드로잉 유틸 ──────────────────────────────────────────────
 
   function drawMask(base64, color) {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        // 오프스크린에서 마스크 픽셀 읽기
         const off = document.createElement('canvas');
         off.width = imgW; off.height = imgH;
-        const offCtx = off.getContext('2d');
-        offCtx.drawImage(img, 0, 0, imgW, imgH);
-        const src = offCtx.getImageData(0, 0, imgW, imgH).data;
+        off.getContext('2d').drawImage(img, 0, 0, imgW, imgH);
+        const src = off.getContext('2d').getImageData(0, 0, imgW, imgH).data;
 
-        // 컬러 마스크 생성
         const colored = overlayCtx.createImageData(imgW, imgH);
         const dst = colored.data;
         for (let i = 0; i < src.length; i += 4) {
           if (src[i] > 128) {
-            dst[i]     = color[0];
-            dst[i + 1] = color[1];
-            dst[i + 2] = color[2];
-            dst[i + 3] = 110; // 약 43% 불투명도
+            dst[i] = color[0]; dst[i+1] = color[1]; dst[i+2] = color[2]; dst[i+3] = 110;
           }
         }
-
-        // 컬러 마스크를 임시 캔버스에 그린 뒤 overlay에 합성
         const tmp = document.createElement('canvas');
         tmp.width = imgW; tmp.height = imgH;
         tmp.getContext('2d').putImageData(colored, 0, 0);
@@ -326,16 +402,26 @@
     overlayCtx.strokeRect(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1);
   }
 
-  function drawClickDot(px, py) {
+  function drawDot(px, py, color) {
     const r = Math.max(6, imgW / 120);
     overlayCtx.beginPath();
     overlayCtx.arc(px, py, r, 0, Math.PI * 2);
-    overlayCtx.fillStyle   = 'rgba(239,68,68,0.9)';
+    overlayCtx.fillStyle   = color;
     overlayCtx.fill();
     overlayCtx.strokeStyle = '#fff';
     overlayCtx.lineWidth   = Math.max(1.5, imgW / 500);
     overlayCtx.stroke();
   }
+
+  function drawInputBox(x1, y1, x2, y2) {
+    overlayCtx.strokeStyle = 'rgba(96,165,250,0.6)';
+    overlayCtx.lineWidth   = Math.max(1.5, imgW / 500);
+    overlayCtx.setLineDash([Math.max(6, imgW / 150), Math.max(3, imgW / 300)]);
+    overlayCtx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+    overlayCtx.setLineDash([]);
+  }
+
+  // ── 정보 패널 ─────────────────────────────────────────────────
 
   function renderInfoPanel(data) {
     const panel = document.getElementById('info-panel');
@@ -348,24 +434,30 @@
           <span class="swatch" style="background:rgb(${c[0]},${c[1]},${c[2]})"></span>
           #${i + 1}
           &nbsp; 신뢰도: <span class="score-val">${(det.score * 100).toFixed(1)}%</span>
-          &nbsp; 박스: <span class="box-val">[${b.x1.toFixed(0)}, ${b.y1.toFixed(0)}, ${b.x2.toFixed(0)}, ${b.y2.toFixed(0)}]</span>
+          &nbsp; 박스: <span class="box-val">[${b.x1}, ${b.y1}, ${b.x2}, ${b.y2}]</span>
         </div>`;
     });
     panel.innerHTML = html;
     panel.style.display = 'block';
   }
 
+  // ── 유틸 ─────────────────────────────────────────────────────
+
   function clearOverlay() {
     overlayCtx.clearRect(0, 0, imgW, imgH);
     document.getElementById('info-panel').style.display = 'none';
-    setStatus('이미지를 클릭해서 객체를 선택하세요.');
-    lastPx = lastPy = null;
+    setStatus('객체를 클릭하거나 드래그하세요.');
+  }
+
+  function setLoading(v) {
+    isLoading = v;
+    updateCursor();
   }
 
   function setStatus(msg, isHtml = false) {
     const el = document.getElementById('status');
-    if (isHtml) el.innerHTML = msg;
-    else el.textContent = msg;
+    if (isHtml) el.innerHTML = `<span class="spinner"></span>${msg}`;
+    else        el.textContent = msg;
   }
 </script>
 </body>
