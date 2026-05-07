@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAM3 Point Segmentation Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #111;
+      color: #e0e0e0;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 18px; color: #fff; }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 18px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary { background: #374151; color: #e0e0e0; }
+    .btn-secondary:hover { background: #4b5563; }
+    .btn:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+
+    input[type="file"] { display: none; }
+
+    .threshold-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #9ca3af;
+    }
+    input[type="range"] { width: 100px; accent-color: #2563eb; }
+    #threshold-val { color: #60a5fa; font-weight: 600; min-width: 28px; }
+
+    .canvas-area {
+      position: relative;
+      display: inline-block;
+      border: 1px solid #2d2d2d;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: crosshair;
+      background: #000;
+    }
+
+    #main-canvas { display: block; max-width: min(900px, calc(100vw - 48px)); }
+    #overlay-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      pointer-events: none;
+      max-width: min(900px, calc(100vw - 48px));
+    }
+
+    #upload-hint {
+      width: 600px;
+      max-width: calc(100vw - 48px);
+      height: 320px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #6b7280;
+      font-size: 14px;
+      cursor: pointer;
+      border: 2px dashed #2d2d2d;
+      border-radius: 8px;
+      transition: border-color 0.2s;
+    }
+    #upload-hint:hover { border-color: #4b5563; }
+    #upload-hint svg { opacity: 0.4; }
+
+    #status {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #6b7280;
+      height: 18px;
+    }
+
+    .info-panel {
+      margin-top: 14px;
+      background: #1c1c1c;
+      border: 1px solid #2d2d2d;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 13px;
+      display: none;
+      max-width: min(900px, calc(100vw - 48px));
+    }
+    .info-title { font-weight: 600; color: #d1d5db; margin-bottom: 10px; }
+    .det-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid #252525;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .det-row:last-child { border-bottom: none; }
+    .swatch { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+    .score-val { color: #34d399; font-weight: 600; }
+    .box-val { color: #94a3b8; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #374151;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<h1>SAM3 Point Segmentation Demo</h1>
+
+<div class="controls">
+  <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">이미지 업로드</button>
+  <input type="file" id="file-input" accept="image/*">
+  <button class="btn btn-secondary" id="clear-btn" disabled onclick="clearOverlay()">초기화</button>
+  <div class="threshold-wrap">
+    신뢰도:
+    <input type="range" id="threshold" min="0.05" max="0.5" step="0.05" value="0.1"
+           oninput="document.getElementById('threshold-val').textContent = this.value">
+    <span id="threshold-val">0.1</span>
+  </div>
+</div>
+
+<!-- 이미지 업로드 전 힌트 영역 -->
+<div id="upload-hint" onclick="document.getElementById('file-input').click()">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+    <polyline points="21 15 16 10 5 21"/>
+  </svg>
+  클릭해서 이미지를 업로드하세요
+</div>
+
+<!-- 이미지 + 오버레이 캔버스 -->
+<div class="canvas-area" id="canvas-area" style="display:none">
+  <canvas id="main-canvas"></canvas>
+  <canvas id="overlay-canvas"></canvas>
+</div>
+
+<div id="status">이미지를 업로드하세요.</div>
+<div class="info-panel" id="info-panel"></div>
+
+<script>
+  const API = 'http://localhost:8001';
+
+  const COLORS = [
+    [76,  195, 247],
+    [255, 138, 101],
+    [129, 199, 132],
+    [255, 213,  79],
+    [186, 104, 200],
+    [255, 171,  64],
+    [77,  182, 172],
+  ];
+
+  let originalFile = null;
+  let imgW = 0, imgH = 0;
+  let lastPx = null, lastPy = null;
+  let isLoading = false;
+
+  const mainCanvas    = document.getElementById('main-canvas');
+  const overlayCanvas = document.getElementById('overlay-canvas');
+  const mainCtx       = mainCanvas.getContext('2d');
+  const overlayCtx    = overlayCanvas.getContext('2d');
+  const canvasArea    = document.getElementById('canvas-area');
+  const uploadHint    = document.getElementById('upload-hint');
+
+  // 파일 선택
+  document.getElementById('file-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    originalFile = file;
+    const img = new Image();
+    img.onload = () => {
+      imgW = img.naturalWidth;
+      imgH = img.naturalHeight;
+
+      mainCanvas.width    = imgW;
+      mainCanvas.height   = imgH;
+      overlayCanvas.width = imgW;
+      overlayCanvas.height = imgH;
+
+      mainCtx.drawImage(img, 0, 0);
+      overlayCtx.clearRect(0, 0, imgW, imgH);
+
+      uploadHint.style.display = 'none';
+      canvasArea.style.display = 'inline-block';
+      document.getElementById('clear-btn').disabled = false;
+      document.getElementById('info-panel').style.display = 'none';
+      setStatus('이미지를 클릭해서 객체를 선택하세요.');
+      lastPx = lastPy = null;
+    };
+    img.src = URL.createObjectURL(file);
+  });
+
+  // 캔버스 클릭
+  mainCanvas.addEventListener('click', async (e) => {
+    if (!originalFile || isLoading) return;
+
+    const rect = mainCanvas.getBoundingClientRect();
+    const scaleX = imgW / rect.width;
+    const scaleY = imgH / rect.height;
+    lastPx = Math.round((e.clientX - rect.left) * scaleX);
+    lastPy = Math.round((e.clientY - rect.top)  * scaleY);
+
+    await runSegment(lastPx, lastPy);
+  });
+
+  async function runSegment(px, py) {
+    isLoading = true;
+    setStatus(`<span class="spinner"></span>(${px}, ${py}) 분석 중...`, true);
+    mainCanvas.style.cursor = 'wait';
+
+    const threshold = parseFloat(document.getElementById('threshold').value);
+    const fd = new FormData();
+    fd.append('image', originalFile);
+    fd.append('x', px);
+    fd.append('y', py);
+    fd.append('confidence_threshold', threshold);
+
+    try {
+      const res = await fetch(`${API}/segment-by-point`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        setStatus(`오류: ${err.detail}`);
+        return;
+      }
+      const data = await res.json();
+      await renderResult(data, px, py);
+    } catch (err) {
+      setStatus(`서버 연결 실패: ${err.message}`);
+    } finally {
+      isLoading = false;
+      mainCanvas.style.cursor = 'crosshair';
+    }
+  }
+
+  async function renderResult(data, px, py) {
+    overlayCtx.clearRect(0, 0, imgW, imgH);
+
+    if (data.num_detections === 0) {
+      setStatus(`(${px}, ${py}) — 객체를 찾지 못했습니다. 신뢰도 임계값을 낮춰보세요.`);
+      document.getElementById('info-panel').style.display = 'none';
+      drawClickDot(px, py);
+      return;
+    }
+
+    // 마스크 → 박스 순서로 순차 렌더링
+    for (let i = 0; i < data.detections.length; i++) {
+      const det   = data.detections[i];
+      const color = COLORS[i % COLORS.length];
+      await drawMask(det.mask_base64, color);
+      drawBox(det.box, color);
+    }
+
+    drawClickDot(px, py);
+    setStatus(`(${px}, ${py}) — ${data.num_detections}개 감지`);
+    renderInfoPanel(data);
+  }
+
+  function drawMask(base64, color) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        // 오프스크린에서 마스크 픽셀 읽기
+        const off = document.createElement('canvas');
+        off.width = imgW; off.height = imgH;
+        const offCtx = off.getContext('2d');
+        offCtx.drawImage(img, 0, 0, imgW, imgH);
+        const src = offCtx.getImageData(0, 0, imgW, imgH).data;
+
+        // 컬러 마스크 생성
+        const colored = overlayCtx.createImageData(imgW, imgH);
+        const dst = colored.data;
+        for (let i = 0; i < src.length; i += 4) {
+          if (src[i] > 128) {
+            dst[i]     = color[0];
+            dst[i + 1] = color[1];
+            dst[i + 2] = color[2];
+            dst[i + 3] = 110; // 약 43% 불투명도
+          }
+        }
+
+        // 컬러 마스크를 임시 캔버스에 그린 뒤 overlay에 합성
+        const tmp = document.createElement('canvas');
+        tmp.width = imgW; tmp.height = imgH;
+        tmp.getContext('2d').putImageData(colored, 0, 0);
+        overlayCtx.drawImage(tmp, 0, 0);
+        resolve();
+      };
+      img.src = 'data:image/png;base64,' + base64;
+    });
+  }
+
+  function drawBox(box, color) {
+    overlayCtx.strokeStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+    overlayCtx.lineWidth   = Math.max(1, imgW / 600);
+    overlayCtx.strokeRect(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1);
+  }
+
+  function drawClickDot(px, py) {
+    const r = Math.max(6, imgW / 120);
+    overlayCtx.beginPath();
+    overlayCtx.arc(px, py, r, 0, Math.PI * 2);
+    overlayCtx.fillStyle   = 'rgba(239,68,68,0.9)';
+    overlayCtx.fill();
+    overlayCtx.strokeStyle = '#fff';
+    overlayCtx.lineWidth   = Math.max(1.5, imgW / 500);
+    overlayCtx.stroke();
+  }
+
+  function renderInfoPanel(data) {
+    const panel = document.getElementById('info-panel');
+    let html = `<div class="info-title">감지 결과 — ${data.num_detections}개</div>`;
+    data.detections.forEach((det, i) => {
+      const c = COLORS[i % COLORS.length];
+      const b = det.box;
+      html += `
+        <div class="det-row">
+          <span class="swatch" style="background:rgb(${c[0]},${c[1]},${c[2]})"></span>
+          #${i + 1}
+          &nbsp; 신뢰도: <span class="score-val">${(det.score * 100).toFixed(1)}%</span>
+          &nbsp; 박스: <span class="box-val">[${b.x1.toFixed(0)}, ${b.y1.toFixed(0)}, ${b.x2.toFixed(0)}, ${b.y2.toFixed(0)}]</span>
+        </div>`;
+    });
+    panel.innerHTML = html;
+    panel.style.display = 'block';
+  }
+
+  function clearOverlay() {
+    overlayCtx.clearRect(0, 0, imgW, imgH);
+    document.getElementById('info-panel').style.display = 'none';
+    setStatus('이미지를 클릭해서 객체를 선택하세요.');
+    lastPx = lastPy = null;
+  }
+
+  function setStatus(msg, isHtml = false) {
+    const el = document.getElementById('status');
+    if (isHtml) el.innerHTML = msg;
+    else el.textContent = msg;
+  }
+</script>
+</body>
+</html>
