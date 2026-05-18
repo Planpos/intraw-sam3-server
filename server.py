@@ -189,7 +189,6 @@ def _setup_interactive_predictor(state, orig_h, orig_w):
     ip._is_image_set = True
     ip._is_batch = False
 
-
 @app.post("/segment-by-point")
 async def segment_by_point(
     image: UploadFile = File(...),

@@ -2,30 +2,190 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>SAM3 객체 분석 테스트</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAM3 테스트 UI</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; }
-    h1 { margin-bottom: 24px; color: #1a1a2e; }
-    .card { background: white; border-radius: 12px; padding: 24px; width: 100%; max-width: 800px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); margin-bottom: 24px; }
-    .row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap; }
-    label { font-size: 13px; color: #555; margin-bottom: 4px; display: block; }
-    input[type="file"] { border: 2px dashed #ccc; padding: 12px; border-radius: 8px; cursor: pointer; flex: 1; min-width: 200px; }
-    input[type="text"], input[type="number"] { border: 1px solid #ccc; padding: 8px 12px; border-radius: 8px; font-size: 14px; width: 100%; }
-    .field { flex: 1; min-width: 150px; }
-    button { background: #4f46e5; color: white; border: none; padding: 10px 24px; border-radius: 8px; font-size: 15px; cursor: pointer; white-space: nowrap; }
-    button:hover { background: #4338ca; }
-    button:disabled { background: #a5b4fc; cursor: not-allowed; }
-    #status { font-size: 14px; color: #666; min-height: 20px; }
-    #canvas-wrap { position: relative; display: inline-block; }
-    canvas { border-radius: 8px; max-width: 100%; display: block; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 32px 20px; min-height: 100vh;
+    }
+
+    h1 { color: #1a1a2e; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { color: #9ca3af; font-size: 13px; margin-bottom: 20px; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex; gap: 4px; background: #e5e7eb;
+      border-radius: 10px; padding: 4px;
+      width: 100%; max-width: 840px; margin-bottom: 20px;
+    }
+    .tab {
+      flex: 1; padding: 8px 16px; border: none; border-radius: 7px;
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      background: transparent; color: #6b7280; transition: all 0.15s;
+    }
+    .tab.active { background: white; color: #1a1a2e; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+    .tab:hover:not(.active) { color: #374151; }
+
+    /* ── Cards ── */
+    .card {
+      background: white; border-radius: 12px; padding: 22px;
+      width: 100%; max-width: 840px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 16px;
+    }
+    .card-title { font-size: 15px; font-weight: 600; color: #1a1a2e; margin-bottom: 14px; }
+
+    /* ── Form ── */
+    .row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 14px; flex-wrap: wrap; }
+    .field { flex: 1; min-width: 140px; }
+    label { font-size: 12px; color: #6b7280; margin-bottom: 4px; display: block; }
+    input[type="text"], input[type="number"] {
+      border: 1px solid #d1d5db; padding: 8px 11px;
+      border-radius: 8px; font-size: 14px; width: 100%;
+      transition: border 0.15s;
+    }
+    input[type="text"]:focus, input[type="number"]:focus {
+      outline: none; border-color: #4f46e5;
+    }
+    input[type="file"] {
+      border: 2px dashed #d1d5db; padding: 10px;
+      border-radius: 8px; cursor: pointer; flex: 1; min-width: 200px;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      border: none; padding: 9px 22px; border-radius: 8px;
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      white-space: nowrap; transition: all 0.15s;
+    }
+    .btn-indigo { background: #4f46e5; color: white; }
+    .btn-indigo:hover { background: #4338ca; }
+    .btn-indigo:disabled { background: #a5b4fc; cursor: not-allowed; }
+    .btn-orange { background: #f97316; color: white; }
+    .btn-orange:hover { background: #ea6c0a; }
+    .btn-orange:disabled { background: #fdba74; cursor: not-allowed; }
+    .btn-gray { background: #9ca3af; color: white; }
+    .btn-gray:hover { background: #6b7280; }
+
+    /* ── Status / Badge ── */
+    .status-line { font-size: 13px; color: #6b7280; min-height: 20px; margin-top: 8px; }
+    .badge {
+      display: inline-block; border-radius: 4px;
+      padding: 2px 8px; font-size: 11px; margin: 2px;
+    }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 2px dashed #d1d5db; border-radius: 10px;
+      padding: 28px; text-align: center; cursor: pointer;
+      transition: all 0.15s; background: #f9fafb; user-select: none;
+    }
+    .drop-zone:hover { border-color: #f97316; background: #fff7ed; }
+    .drop-zone.drag-over { border-color: #f97316; background: #fff7ed; box-shadow: 0 0 0 3px rgba(249,115,22,0.15); }
+    .drop-zone .dz-icon { font-size: 28px; margin-bottom: 6px; }
+    .drop-zone .dz-main { font-size: 14px; color: #374151; font-weight: 500; }
+    .drop-zone .dz-sub { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+    .drop-zone input[type="file"] { display: none; }
+
+    .img-preview {
+      max-width: 100%; max-height: 180px; border-radius: 8px;
+      margin-top: 12px; display: none;
+      border: 1px solid #e5e7eb; object-fit: contain;
+    }
+
+    /* ── Angle result grid ── */
+    .angle-grid { display: grid; grid-template-columns: 1fr 260px; gap: 20px; }
+    @media (max-width: 620px) { .angle-grid { grid-template-columns: 1fr; } }
+
+    /* ── Gauge ── */
+    .gauge-wrap { display: flex; flex-direction: column; align-items: center; }
+    #gauge { width: 100%; max-width: 220px; }
+
+    .angle-number {
+      font-size: 48px; font-weight: 700;
+      text-align: center; line-height: 1.1;
+      margin: 6px 0 2px;
+      transition: color 0.3s;
+    }
+    .angle-sublabel { font-size: 11px; color: #9ca3af; text-align: center; }
+
+    /* ── Stats ── */
+    .stat-block { width: 100%; margin-top: 14px; }
+    .stat-row {
+      display: flex; justify-content: space-between;
+      align-items: center; font-size: 12px; margin-bottom: 4px;
+    }
+    .stat-label { color: #6b7280; }
+    .stat-value { font-weight: 600; color: #1a1a2e; }
+    .progress-wrap { height: 5px; background: #e5e7eb; border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+    .progress-fill { height: 100%; border-radius: 3px; transition: width 0.4s, background 0.3s; }
+
+    /* ── Interpretation ── */
+    .interpretation {
+      background: #f9fafb; border-radius: 8px;
+      padding: 10px 12px; margin-top: 10px;
+      font-size: 12px; line-height: 1.6; color: #374151;
+      border-left: 3px solid #f97316;
+    }
+    .interpretation strong { color: #f97316; }
+
+    /* ── Note ── */
+    .note-box {
+      background: #fef9c3; border-radius: 8px;
+      padding: 9px 12px; margin-top: 10px;
+      font-size: 11px; color: #854d0e; line-height: 1.5;
+    }
+
+    /* ── Canvas wrap ── */
+    .canvas-section-label { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+    #angleCanvas {
+      border-radius: 8px; max-width: 100%; display: block;
+      border: 1px solid #e5e7eb;
+    }
+
+    /* ── Tab content ── */
+    .tab-content { display: none; width: 100%; max-width: 840px; }
+    .tab-content.active { display: block; }
+
+    /* ── Existing analyze UI ── */
+    #canvas { border-radius: 8px; max-width: 100%; display: block; }
     #info { font-size: 13px; color: #444; margin-top: 12px; }
-    .badge { display: inline-block; background: #e0e7ff; color: #4f46e5; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin: 2px; }
+    #status { font-size: 13px; color: #6b7280; min-height: 18px; }
+
+    /* ── Details / JSON ── */
+    details { margin-top: 14px; }
+    summary { font-size: 12px; color: #9ca3af; cursor: pointer; user-select: none; }
+    summary:hover { color: #6b7280; }
+    pre#rawJson {
+      font-size: 11px; background: #f9fafb; padding: 12px;
+      border-radius: 6px; margin-top: 8px;
+      overflow: auto; max-height: 200px; color: #374151;
+      line-height: 1.5;
+    }
+
+    /* ── Legend ── */
+    .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; font-size: 11px; color: #6b7280; }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
   </style>
 </head>
 <body>
-  <h1>SAM3 객체 분석 테스트</h1>
 
+<h1>SAM3 테스트 UI</h1>
+<p class="subtitle">Segment Anything Model 3 — 객체 분석 · 가구 사선각도 감지</p>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('analyze')">객체 분석</button>
+  <button class="tab" onclick="showTab('angle')">가구 사선각도 감지</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     TAB 1 : 객체 분석 (기존 기능)
+══════════════════════════════════════════════════════ -->
+<div id="tab-analyze" class="tab-content active">
   <div class="card">
     <div class="row">
       <div class="field">
@@ -33,142 +193,597 @@
         <input type="file" id="imageInput" accept="image/*">
       </div>
       <div class="field">
-        <label>프롬프트 <span style="font-size:11px;color:#888">(비워두면 자동으로 모든 객체 탐지)</span></label>
-        <input type="text" id="prompt" value="" placeholder="비워두면 자동 탐지 / 특정 객체: person, car, dog ...">
+        <label>프롬프트 <span style="font-size:11px;color:#aaa">(비워두면 자동 탐지)</span></label>
+        <input type="text" id="prompt" placeholder="예: sofa, chair, table …">
       </div>
-      <div class="field" style="max-width:130px">
+      <div class="field" style="max-width:120px">
         <label>신뢰도 임계값</label>
         <input type="number" id="threshold" value="0.3" min="0.1" max="1.0" step="0.05">
       </div>
-      <button id="analyzeBtn" onclick="analyze()">객체 분석</button>
+      <button class="btn btn-indigo" id="analyzeBtn" onclick="analyze()">객체 분석</button>
     </div>
     <div id="status"></div>
   </div>
 
   <div class="card" id="resultCard" style="display:none">
-    <div id="canvas-wrap">
-      <canvas id="canvas"></canvas>
-    </div>
+    <canvas id="canvas"></canvas>
     <div id="info"></div>
   </div>
+</div>
 
-  <script>
-    const SERVER = 'http://localhost:8001';
-    const COLORS = [
-      [255,99,132],[54,162,235],[255,206,86],[75,192,192],
-      [153,102,255],[255,159,64],[199,199,199],[83,102,255],
-      [255,99,255],[99,255,132],[255,200,100],[100,200,255],
+<!-- ══════════════════════════════════════════════════════
+     TAB 2 : 가구 사선각도 감지
+══════════════════════════════════════════════════════ -->
+<div id="tab-angle" class="tab-content">
+
+  <!-- 업로드 카드 -->
+  <div class="card">
+    <p class="card-title">가구 사선각도 감지</p>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:16px;line-height:1.6">
+      가구 이미지를 업로드하면 SAM3로 세그멘테이션 → PCA 주축 분석으로<br>
+      가구가 정면 기준 몇 도 사선인지 추정합니다.
+    </p>
+
+    <!-- 드롭존 -->
+    <div class="drop-zone" id="dropZone">
+      <div class="dz-icon">🪑</div>
+      <div class="dz-main" id="dzMain">클릭 또는 드래그로 가구 이미지 업로드</div>
+      <div class="dz-sub">JPG · PNG · WEBP 지원</div>
+      <input type="file" id="furnitureInput" accept="image/*">
+    </div>
+    <img id="furPreview" class="img-preview" alt="미리보기">
+
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn btn-orange" id="detectBtn" onclick="detectAngle()" style="flex:1">
+        사선각도 감지 시작
+      </button>
+      <button class="btn btn-gray" onclick="clearAngle()">초기화</button>
+    </div>
+    <div class="status-line" id="angleStatus"></div>
+  </div>
+
+  <!-- 결과 카드 -->
+  <div class="card" id="angleResultCard" style="display:none">
+
+    <div class="angle-grid">
+
+      <!-- 왼쪽: 세그멘테이션 캔버스 -->
+      <div>
+        <p class="canvas-section-label">세그멘테이션 마스크 + 주축 방향</p>
+        <canvas id="angleCanvas"></canvas>
+
+        <!-- 범례 -->
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-dot" style="background:rgba(249,115,22,0.65)"></div>
+            <span>세그멘테이션 마스크</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#f97316;height:3px;width:16px;border-radius:2px"></div>
+            <span>PCA 주축</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:rgba(255,255,255,0.7);height:2px;width:16px;border-radius:2px;border:1px dashed #999"></div>
+            <span>수평 기준(0°)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 오른쪽: 게이지 + 수치 -->
+      <div class="gauge-wrap">
+        <p class="canvas-section-label" style="text-align:center">감지된 사선 각도</p>
+
+        <!-- SVG 게이지 -->
+        <svg id="gauge" viewBox="0 0 200 120"></svg>
+
+        <div class="angle-number" id="angleNumber">—</div>
+        <div class="angle-sublabel">정면 기준 2D 주축 각도 (±90°)</div>
+
+        <!-- 범례 색상 -->
+        <div class="legend" style="justify-content:center;margin-top:8px">
+          <div class="legend-item"><div class="legend-dot" style="background:#bbf7d0"></div><span>정면</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fde68a"></div><span>약한 사선</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span>강한 사선</span></div>
+        </div>
+
+        <!-- 수치 -->
+        <div class="stat-block">
+          <div class="stat-row">
+            <span class="stat-label">신뢰도 (confidence)</span>
+            <span class="stat-value" id="confValue">—</span>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-fill" id="confBar" style="width:0%"></div>
+          </div>
+
+          <div class="stat-row">
+            <span class="stat-label">종횡비 (단축/장축)</span>
+            <span class="stat-value" id="aspectValue">—</span>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-fill" id="aspectBar" style="width:0%;background:#4f46e5"></div>
+          </div>
+
+          <div class="stat-row">
+            <span class="stat-label">마스크 품질 (IOU)</span>
+            <span class="stat-value" id="iouValue">—</span>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-fill" id="iouBar" style="width:0%;background:#6366f1"></div>
+          </div>
+        </div>
+
+        <div class="interpretation" id="interpretation"></div>
+        <div class="note-box">
+          ⚠️ PCA 각도는 <strong>2D 이미지 주축</strong> 방향입니다.<br>
+          3D 시점각과 정확히 일치하지 않을 수 있으며, 사선이 뚜렷할수록 신뢰도가 높습니다.
+        </div>
+      </div>
+    </div>
+
+    <!-- Raw JSON -->
+    <details>
+      <summary>응답 원본 JSON 보기</summary>
+      <pre id="rawJson"></pre>
+    </details>
+  </div>
+
+</div><!-- /tab-angle -->
+
+<!-- ══════════════════════════════════════════════════════
+     SCRIPT
+══════════════════════════════════════════════════════ -->
+<script>
+  const SERVER = 'http://localhost:8001';
+
+  const ANALYZE_COLORS = [
+    [255,99,132],[54,162,235],[255,206,86],[75,192,192],
+    [153,102,255],[255,159,64],[199,199,199],[83,102,255],
+    [255,99,255],[99,255,132],[255,200,100],[100,200,255],
+  ];
+
+  // ─── 탭 전환 ────────────────────────────────────────────
+  function showTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.tab[onclick="showTab('${name}')"]`).classList.add('active');
+    document.getElementById(`tab-${name}`).classList.add('active');
+  }
+
+  // ─── 공통 유틸 ──────────────────────────────────────────
+  function loadImage(src) {
+    return new Promise(resolve => {
+      const img = new window.Image();
+      img.onload = () => resolve(img);
+      img.src = typeof src === 'string' ? src : URL.createObjectURL(src);
+    });
+  }
+
+  function loadBase64Image(b64) {
+    return new Promise(resolve => {
+      const img = new window.Image();
+      img.onload = () => resolve(img);
+      img.src = 'data:image/png;base64,' + b64;
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  TAB 1 : 객체 분석
+  // ═══════════════════════════════════════════════════════════
+  async function analyze() {
+    const fileInput = document.getElementById('imageInput');
+    const prompt = document.getElementById('prompt').value || 'object';
+    const threshold = document.getElementById('threshold').value;
+    const btn = document.getElementById('analyzeBtn');
+    const status = document.getElementById('status');
+
+    if (!fileInput.files[0]) { alert('이미지를 선택해주세요.'); return; }
+
+    btn.disabled = true;
+    status.textContent = '분석 중...';
+
+    const fd = new FormData();
+    fd.append('image', fileInput.files[0]);
+    fd.append('prompt', prompt);
+    fd.append('confidence_threshold', threshold);
+
+    try {
+      const res = await fetch(`${SERVER}/analyze`, { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
+      const data = await res.json();
+      await drawAnalyzeResult(fileInput.files[0], data);
+      status.textContent = `완료! ${data.num_detections}개 객체 감지됨`;
+    } catch (e) {
+      status.textContent = `오류: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function drawAnalyzeResult(file, data) {
+    const img = await loadImage(file);
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = data.image_width;
+    canvas.height = data.image_height;
+    ctx.drawImage(img, 0, 0);
+
+    for (let i = 0; i < data.detections.length; i++) {
+      const det = data.detections[i];
+      const color = ANALYZE_COLORS[i % ANALYZE_COLORS.length];
+
+      const maskImg = await loadBase64Image(det.mask_base64);
+      const off = document.createElement('canvas');
+      off.width = data.image_width; off.height = data.image_height;
+      const octx = off.getContext('2d');
+      octx.drawImage(maskImg, 0, 0);
+      const px = octx.getImageData(0, 0, data.image_width, data.image_height);
+      for (let p = 0; p < px.data.length; p += 4) {
+        if (px.data[p] > 128) {
+          px.data[p] = color[0]; px.data[p+1] = color[1];
+          px.data[p+2] = color[2]; px.data[p+3] = 100;
+        } else { px.data[p+3] = 0; }
+      }
+      octx.putImageData(px, 0, 0);
+      ctx.drawImage(off, 0, 0);
+
+      const { x1, y1, x2, y2 } = det.box;
+      ctx.strokeStyle = `rgb(${color.join(',')})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+      const label = det.label
+        ? `${det.label} ${(det.score * 100).toFixed(0)}%`
+        : `#${det.id} ${(det.score * 100).toFixed(0)}%`;
+      const lw = ctx.measureText(label).width + 10;
+      ctx.fillStyle = `rgb(${color.join(',')})`;
+      ctx.fillRect(x1, y1 - 20, lw, 20);
+      ctx.fillStyle = 'white';
+      ctx.font = '13px sans-serif';
+      ctx.fillText(label, x1 + 4, y1 - 5);
+    }
+
+    const info = document.getElementById('info');
+    info.innerHTML = `<b>프롬프트:</b> "${data.prompt}" &nbsp;|&nbsp; <b>감지 수:</b> ${data.num_detections}개<br><br>`;
+    data.detections.forEach((d, i) => {
+      const c = ANALYZE_COLORS[i % ANALYZE_COLORS.length];
+      const name = d.label || `#${d.id}`;
+      info.innerHTML += `<span class="badge" style="background:rgba(${c},0.15);color:rgb(${c})">${name} ${(d.score*100).toFixed(1)}%</span>`;
+    });
+    document.getElementById('resultCard').style.display = 'block';
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  TAB 2 : 가구 사선각도 감지
+  // ═══════════════════════════════════════════════════════════
+  let currentFurnitureFile = null;
+
+  // 드롭존 이벤트
+  const dropZone = document.getElementById('dropZone');
+  const furInput = document.getElementById('furnitureInput');
+
+  dropZone.addEventListener('click', () => furInput.click());
+
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', e => {
+    if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('drag-over');
+  });
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) setFurnitureFile(file);
+  });
+
+  furInput.addEventListener('change', e => {
+    if (e.target.files[0]) setFurnitureFile(e.target.files[0]);
+  });
+
+  function setFurnitureFile(file) {
+    currentFurnitureFile = file;
+    const preview = document.getElementById('furPreview');
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    document.getElementById('dzMain').textContent = file.name;
+    document.getElementById('angleResultCard').style.display = 'none';
+    document.getElementById('angleStatus').textContent = '';
+  }
+
+  function clearAngle() {
+    currentFurnitureFile = null;
+    furInput.value = '';
+    document.getElementById('furPreview').style.display = 'none';
+    document.getElementById('dzMain').textContent = '클릭 또는 드래그로 가구 이미지 업로드';
+    document.getElementById('angleResultCard').style.display = 'none';
+    document.getElementById('angleStatus').textContent = '';
+  }
+
+  async function detectAngle() {
+    if (!currentFurnitureFile) { alert('가구 이미지를 먼저 업로드해주세요.'); return; }
+
+    const btn = document.getElementById('detectBtn');
+    const status = document.getElementById('angleStatus');
+    btn.disabled = true;
+    status.textContent = '⏳ SAM3 세그멘테이션 중…';
+
+    const fd = new FormData();
+    fd.append('image', currentFurnitureFile);
+    // cx, cy 생략 → 서버가 이미지 중심 클릭 사용
+
+    try {
+      const res = await fetch(`${SERVER}/estimate-furniture-angle`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `서버 오류 ${res.status}`);
+      }
+      const data = await res.json();
+
+      status.textContent = `✅ 완료! 추정 주축 각도: ${data.angle_deg >= 0 ? '+' : ''}${data.angle_deg}°`;
+      await renderAngleResult(currentFurnitureFile, data);
+      document.getElementById('angleResultCard').style.display = 'block';
+      document.getElementById('rawJson').textContent = JSON.stringify(data, null, 2);
+
+    } catch (e) {
+      status.textContent = `❌ 오류: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ── 각도 결과 렌더링 ─────────────────────────────────────
+  async function renderAngleResult(file, data) {
+    const img = await loadImage(file);
+
+    // 캔버스 크기 (최대 480px 폭으로 스케일)
+    const MAX_W = 480;
+    const scale = Math.min(1, MAX_W / data.image_width);
+    const cW = Math.round(data.image_width * scale);
+    const cH = Math.round(data.image_height * scale);
+
+    const canvas = document.getElementById('angleCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = cW;
+    canvas.height = cH;
+    ctx.scale(scale, scale);
+
+    // 원본 이미지 (scale 전 좌표 사용)
+    ctx.drawImage(img, 0, 0, data.image_width, data.image_height);
+
+    // 마스크 오버레이 (오렌지)
+    const maskImg = await loadBase64Image(data.mask_base64);
+    const off = document.createElement('canvas');
+    off.width = data.image_width; off.height = data.image_height;
+    const octx = off.getContext('2d');
+    octx.drawImage(maskImg, 0, 0);
+    const px = octx.getImageData(0, 0, data.image_width, data.image_height);
+    for (let p = 0; p < px.data.length; p += 4) {
+      if (px.data[p] > 128) {
+        px.data[p] = 249; px.data[p+1] = 115; px.data[p+2] = 22; px.data[p+3] = 130;
+      } else { px.data[p+3] = 0; }
+    }
+    octx.putImageData(px, 0, 0);
+    ctx.drawImage(off, 0, 0, data.image_width, data.image_height);
+
+    // 바운딩박스 (점선)
+    const { x1, y1, x2, y2 } = data.bbox;
+    ctx.strokeStyle = 'rgba(249,115,22,0.85)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+    ctx.setLineDash([]);
+
+    // 중심점 (bbox 중심으로 근사)
+    const cx = (x1 + x2) / 2;
+    const cy = (y1 + y2) / 2;
+
+    // 주축 라인 길이
+    const halfLen = Math.max(x2 - x1, y2 - y1) * 0.55;
+    const angleRad = data.angle_deg * Math.PI / 180;
+    const dx = Math.cos(angleRad) * halfLen;
+    const dy = Math.sin(angleRad) * halfLen;
+
+    // 수평 기준선 (흰색 점선)
+    ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(cx - halfLen * 0.85, cy);
+    ctx.lineTo(cx + halfLen * 0.85, cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 주축 라인 (오렌지, 화살표 스타일)
+    const absAngle = Math.abs(data.angle_deg);
+    const lineColor = absAngle < 15 ? '#22c55e' : absAngle < 45 ? '#f59e0b' : '#ef4444';
+
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 5;
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - dx, cy - dy);
+    ctx.lineTo(cx + dx, cy + dy);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // 주축 끝점 화살표 삼각형
+    drawArrowHead(ctx, cx - dx, cy - dy, cx + dx, cy + dy, lineColor);
+    drawArrowHead(ctx, cx + dx, cy + dy, cx - dx, cy - dy, lineColor);
+
+    // 중심 원
+    ctx.fillStyle = lineColor;
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // 각도 텍스트 (bbox 위)
+    const labelY = y1 > 30 ? y1 - 10 : y2 + 22;
+    const angleSign = data.angle_deg > 0 ? '+' : '';
+    ctx.font = `bold ${Math.max(14, Math.round(data.image_width * 0.035))}px sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = lineColor;
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 4;
+    ctx.fillText(`${angleSign}${data.angle_deg}°`, x1 + 4, labelY);
+    ctx.shadowBlur = 0;
+
+    // ── 게이지 + 우측 수치 업데이트 ──
+    drawGauge(data.angle_deg);
+
+    const angleSign2 = data.angle_deg > 0 ? '+' : '';
+    const numEl = document.getElementById('angleNumber');
+    numEl.textContent = `${angleSign2}${data.angle_deg}°`;
+    numEl.style.color = lineColor;
+
+    const confPct = Math.round(data.confidence * 100);
+    document.getElementById('confValue').textContent = `${confPct}%`;
+    document.getElementById('confBar').style.width = `${confPct}%`;
+    document.getElementById('confBar').style.background =
+      confPct > 60 ? '#22c55e' : confPct > 30 ? '#f59e0b' : '#ef4444';
+
+    const aspectPct = Math.round(data.aspect_ratio * 100);
+    document.getElementById('aspectValue').textContent = data.aspect_ratio.toFixed(3);
+    document.getElementById('aspectBar').style.width = `${aspectPct}%`;
+
+    const iouPct = Math.round(data.iou_score * 100);
+    document.getElementById('iouValue').textContent = `${iouPct}%`;
+    document.getElementById('iouBar').style.width = `${iouPct}%`;
+
+    // 해석
+    let interp = '';
+    if (data.confidence < 0.2) {
+      interp = '<strong>⚠️ 신뢰도 낮음</strong> — 세그멘테이션이 불확실합니다. 이미지 중심에 가구가 있는지 확인하세요.';
+    } else if (absAngle < 10) {
+      interp = '<strong>✅ 정면뷰</strong> — 가구가 카메라를 거의 정면으로 바라보고 있습니다. 사선 보정이 불필요합니다.';
+    } else if (absAngle < 15) {
+      interp = `<strong>✅ 거의 정면</strong> — 매우 약한 사선(${data.angle_deg}°). 보정 효과가 미미할 수 있습니다.`;
+    } else if (absAngle < 40) {
+      const dir = data.angle_deg > 0 ? '우' : '좌';
+      interp = `<strong>↗ 약한 사선</strong> — ${dir}향 약 ${Math.abs(data.angle_deg)}° 사선 배치. ryDeg에 <code>${Math.abs(data.angle_deg)}°</code> 보정을 고려하세요.`;
+    } else {
+      const dir = data.angle_deg > 0 ? '우' : '좌';
+      interp = `<strong>↗ 강한 사선</strong> — ${dir}향 ${Math.abs(data.angle_deg)}° 사선 (측면뷰에 가까움). ryDeg에 <code>${Math.abs(data.angle_deg)}°</code> 보정을 적용하세요.`;
+    }
+    document.getElementById('interpretation').innerHTML = interp;
+  }
+
+  // ── 화살표 헤드 그리기 ──────────────────────────────────
+  function drawArrowHead(ctx, fromX, fromY, toX, toY, color) {
+    const headLen = 10;
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    ctx.fillStyle = color;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(
+      toX - headLen * Math.cos(angle - Math.PI / 7),
+      toY - headLen * Math.sin(angle - Math.PI / 7)
+    );
+    ctx.lineTo(
+      toX - headLen * Math.cos(angle + Math.PI / 7),
+      toY - headLen * Math.sin(angle + Math.PI / 7)
+    );
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ── SVG 게이지 ──────────────────────────────────────────
+  function drawGauge(angleDeg) {
+    const CX = 100, CY = 98, R = 72;
+
+    // 가구 각도 → SVG 좌표 변환
+    // furAngle 0° = top (SVG 90°), -90°=left(SVG180°), +90°=right(SVG0°)
+    function pt(furAngle, radius) {
+      const rad = (90 - furAngle) * Math.PI / 180;
+      return {
+        x: +(CX + radius * Math.cos(rad)).toFixed(2),
+        y: +(CY - radius * Math.sin(rad)).toFixed(2),
+      };
+    }
+
+    // 호 경로 (항상 반시계방향으로 -90→+90 진행, sweep=0)
+    function arcPath(a1, a2, r) {
+      const p1 = pt(a1, r), p2 = pt(a2, r);
+      const large = Math.abs(a2 - a1) > 180 ? 1 : 0;
+      return `M${p1.x},${p1.y} A${r},${r} 0 ${large},0 ${p2.x},${p2.y}`;
+    }
+
+    // 색상
+    const absAngle = Math.abs(angleDeg);
+    const needleColor = absAngle < 15 ? '#16a34a' : absAngle < 45 ? '#d97706' : '#dc2626';
+
+    // 바늘 끝
+    const np = pt(angleDeg, R - 14);
+
+    // 틱 마크
+    let ticks = '';
+    for (let a = -90; a <= 90; a += 15) {
+      const isMajor = a % 45 === 0;
+      const outer = pt(a, R + 3);
+      const inner = pt(a, R - (isMajor ? 10 : 5));
+      ticks += `<line x1="${outer.x}" y1="${outer.y}" x2="${inner.x}" y2="${inner.y}"
+        stroke="${isMajor ? '#9ca3af' : '#d1d5db'}" stroke-width="${isMajor ? 1.8 : 1}" stroke-linecap="round"/>`;
+    }
+
+    // 라벨 (-90, -45, 0, +45, +90)
+    const labelAngles = [
+      { a: -90, t: '-90°' }, { a: -45, t: '-45°' }, { a: 0, t: '0°' },
+      { a: 45, t: '+45°' }, { a: 90, t: '+90°' },
     ];
-
-    async function analyze() {
-      const fileInput = document.getElementById('imageInput');
-      const prompt = document.getElementById('prompt').value || 'object';
-      const threshold = document.getElementById('threshold').value;
-      const btn = document.getElementById('analyzeBtn');
-      const status = document.getElementById('status');
-
-      if (!fileInput.files[0]) { alert('이미지를 선택해주세요.'); return; }
-
-      btn.disabled = true;
-      status.textContent = '분석 중...';
-
-      const formData = new FormData();
-      formData.append('image', fileInput.files[0]);
-      formData.append('prompt', prompt);
-      formData.append('confidence_threshold', threshold);
-
-      try {
-        const res = await fetch(`${SERVER}/analyze`, { method: 'POST', body: formData });
-        if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
-        const data = await res.json();
-
-        await drawResult(fileInput.files[0], data);
-        status.textContent = `완료! ${data.num_detections}개 객체 감지됨`;
-      } catch (e) {
-        status.textContent = `오류: ${e.message}`;
-      } finally {
-        btn.disabled = false;
-      }
+    let labels = '';
+    for (const { a, t } of labelAngles) {
+      const lp = pt(a, R + 17);
+      labels += `<text x="${lp.x}" y="${lp.y}" text-anchor="middle" dominant-baseline="middle"
+        fill="#9ca3af" font-size="8.5" font-family="sans-serif">${t}</text>`;
     }
 
-    async function drawResult(file, data) {
-      const img = await loadImage(file);
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
-      canvas.width = data.image_width;
-      canvas.height = data.image_height;
+    document.getElementById('gauge').innerHTML = `
+      <!-- 배경 회색 호 -->
+      <path d="${arcPath(-90, 90, R)}" fill="none" stroke="#e5e7eb" stroke-width="11" stroke-linecap="round"/>
+      <!-- 강한사선 왼쪽 (빨강) -->
+      <path d="${arcPath(-90, -45, R)}" fill="none" stroke="#fca5a5" stroke-width="11"/>
+      <!-- 약한사선 왼쪽 (노랑) -->
+      <path d="${arcPath(-45, -15, R)}" fill="none" stroke="#fde68a" stroke-width="11"/>
+      <!-- 정면 (초록) -->
+      <path d="${arcPath(-15, 15, R)}" fill="none" stroke="#bbf7d0" stroke-width="11"/>
+      <!-- 약한사선 오른쪽 (노랑) -->
+      <path d="${arcPath(15, 45, R)}" fill="none" stroke="#fde68a" stroke-width="11"/>
+      <!-- 강한사선 오른쪽 (빨강) -->
+      <path d="${arcPath(45, 90, R)}" fill="none" stroke="#fca5a5" stroke-width="11"/>
 
-      ctx.drawImage(img, 0, 0);
+      <!-- 틱 마크 -->
+      ${ticks}
 
-      // 마스크 + 박스 그리기
-      for (let i = 0; i < data.detections.length; i++) {
-        const det = data.detections[i];
-        const color = COLORS[i % COLORS.length];
+      <!-- 바늘 -->
+      <line x1="${CX}" y1="${CY}" x2="${np.x}" y2="${np.y}"
+        stroke="${needleColor}" stroke-width="2.5" stroke-linecap="round"
+        filter="drop-shadow(0 1px 2px rgba(0,0,0,0.3))"/>
 
-        // 마스크 오버레이
-        const maskImg = await loadBase64Image(det.mask_base64);
-        const offscreen = document.createElement('canvas');
-        offscreen.width = data.image_width;
-        offscreen.height = data.image_height;
-        const octx = offscreen.getContext('2d');
-        octx.drawImage(maskImg, 0, 0);
-        const pixels = octx.getImageData(0, 0, data.image_width, data.image_height);
-        for (let p = 0; p < pixels.data.length; p += 4) {
-          if (pixels.data[p] > 128) {
-            pixels.data[p]   = color[0];
-            pixels.data[p+1] = color[1];
-            pixels.data[p+2] = color[2];
-            pixels.data[p+3] = 100;
-          } else {
-            pixels.data[p+3] = 0;
-          }
-        }
-        octx.putImageData(pixels, 0, 0);
-        ctx.drawImage(offscreen, 0, 0);
+      <!-- 중심 원 -->
+      <circle cx="${CX}" cy="${CY}" r="5.5" fill="${needleColor}"/>
+      <circle cx="${CX}" cy="${CY}" r="3" fill="white"/>
 
-        // 바운딩 박스
-        const {x1, y1, x2, y2} = det.box;
-        ctx.strokeStyle = `rgb(${color.join(',')})`;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x1, y1, x2-x1, y2-y1);
+      <!-- 바늘 끝 원 -->
+      <circle cx="${np.x}" cy="${np.y}" r="3.5" fill="${needleColor}"/>
 
-        // 라벨
-        const label = det.label ? `${det.label} ${(det.score * 100).toFixed(0)}%` : `#${det.id} ${(det.score * 100).toFixed(0)}%`;
-        const labelW = ctx.measureText(label).width + 10;
-        ctx.fillStyle = `rgb(${color.join(',')})`;
-        ctx.fillRect(x1, y1 - 20, labelW, 20);
-        ctx.fillStyle = 'white';
-        ctx.font = '13px sans-serif';
-        ctx.fillText(label, x1 + 4, y1 - 5);
-      }
+      <!-- 라벨 -->
+      ${labels}
+    `;
+  }
 
-      // 정보 표시
-      const info = document.getElementById('info');
-      info.innerHTML = `<b>프롬프트:</b> "${data.prompt}" &nbsp;|&nbsp; <b>감지 수:</b> ${data.num_detections}개<br><br>`;
-      data.detections.forEach((d, i) => {
-        const c = COLORS[i % COLORS.length];
-        const name = d.label || `#${d.id}`;
-        info.innerHTML += `<span class="badge" style="background:rgba(${c},0.15);color:rgb(${c})">${name} ${(d.score*100).toFixed(1)}%</span>`;
-      });
+  // 페이지 로드 시 게이지 초기화
+  drawGauge(0);
 
-      document.getElementById('resultCard').style.display = 'block';
-    }
-
-    function loadImage(file) {
-      return new Promise(resolve => {
-        const img = new window.Image();
-        img.onload = () => resolve(img);
-        img.src = URL.createObjectURL(file);
-      });
-    }
-
-    function loadBase64Image(b64) {
-      return new Promise(resolve => {
-        const img = new window.Image();
-        img.onload = () => resolve(img);
-        img.src = 'data:image/png;base64,' + b64;
-      });
-    }
-  </script>
+</script>
 </body>
 </html>
