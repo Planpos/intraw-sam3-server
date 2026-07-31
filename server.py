@@ -9,9 +9,9 @@ from contextlib import asynccontextmanager
 import numpy as np
 import torch
 from scipy import ndimage
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from PIL import Image
 
 logging.basicConfig(level=logging.INFO)
@@ -64,6 +64,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+SAM_API_KEY = os.environ.get("SAM_API_KEY", "").strip()
+if not SAM_API_KEY:
+    logger.warning(
+        "SAM_API_KEY not set — inference endpoints are unauthenticated. "
+        "Required before exposing this server via a public tunnel."
+    )
+
+
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):
+    # 헬스체크/데모 페이지는 그대로 공개, 실제 추론(POST) 엔드포인트만 API 키로 보호.
+    # SAM_API_KEY 미설정 시(로컬 전용 개발) 기존처럼 무인증으로 동작.
+    if SAM_API_KEY and request.method == "POST":
+        provided = request.headers.get("x-api-key", "")
+        if provided != SAM_API_KEY:
+            return JSONResponse(status_code=401, content={"error": "invalid or missing X-API-Key"})
+    return await call_next(request)
 
 
 def clean_mask(mask: np.ndarray) -> np.ndarray:
@@ -140,6 +158,10 @@ def run_inference_with_state(state, prompt, confidence_threshold):
         logger.warning(f"[{prompt}] 추론 실패: {e}")
         return []
 
+
+@app.get("/")
+def root():
+    return RedirectResponse(url="/demo")
 
 @app.get("/demo")
 def demo():
@@ -339,6 +361,160 @@ async def segment_by_box(
         "image_height": orig_h,
         "box": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
         "num_detections": 1,
+        "detections": detections,
+    }
+
+
+@app.post("/segment")
+async def segment_combined(
+    image: UploadFile = File(...),
+    # point inputs (optional)
+    x: float | None = Form(default=None),
+    y: float | None = Form(default=None),
+    # box inputs (optional)
+    x1: float | None = Form(default=None),
+    y1: float | None = Form(default=None),
+    x2: float | None = Form(default=None),
+    y2: float | None = Form(default=None),
+    # text prompt inputs (optional)
+    prompt: str = Form(default=""),
+    confidence_threshold: float = Form(default=0.2),
+    use_auto: bool = Form(default=False),
+):
+    """
+    포인트·박스·텍스트 프롬프트를 하나의 엔드포인트로 처리합니다.
+    - x, y 제공 → 포인트 세그멘테이션
+    - x1, y1, x2, y2 제공 → 박스 세그멘테이션
+    - prompt 제공 또는 use_auto=True → 텍스트 세그멘테이션
+    여러 입력이 동시에 제공되면 모두 처리하여 결과를 합산합니다.
+    """
+    if processor is None or interactive_predictor is None:
+        raise HTTPException(status_code=503, detail="모델 로딩 중입니다.")
+
+    has_point = x is not None and y is not None
+    has_box = x1 is not None and y1 is not None and x2 is not None and y2 is not None
+    has_text = bool(prompt.strip()) or use_auto
+
+    if not has_point and not has_box and not has_text:
+        raise HTTPException(status_code=400, detail="point(x,y), box(x1,y1,x2,y2), prompt 중 하나 이상 제공하세요.")
+
+    try:
+        contents = await image.read()
+        pil_image = Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"이미지 파일 오류: {e}")
+
+    orig_w, orig_h = pil_image.size
+    logger.info(f"[combined] point={has_point} box={has_box} text={has_text}")
+
+    try:
+        base_state = processor.set_image(pil_image)
+        all_detections = []
+
+        if has_point or has_box:
+            _setup_interactive_predictor(base_state, orig_h, orig_w)
+
+        if has_point:
+            logger.info(f"[combined] 포인트 세그멘테이션: ({x},{y})")
+            point_coords = np.array([[x, y]], dtype=np.float32)
+            point_labels = np.array([1], dtype=np.int32)
+            masks, iou_scores, _ = interactive_predictor.predict(
+                point_coords=point_coords,
+                point_labels=point_labels,
+                multimask_output=False,
+            )
+            px_i, py_i = int(round(x)), int(round(y))
+            img_area = orig_w * orig_h
+            candidates = []
+            for i, (m, s) in enumerate(zip(masks, iou_scores)):
+                m_bool = m.astype(bool)
+                in_click = (0 <= py_i < m_bool.shape[0] and
+                            0 <= px_i < m_bool.shape[1] and
+                            m_bool[py_i, px_i])
+                area = int(m_bool.sum())
+                if in_click and area < img_area * 0.6:
+                    candidates.append((i, m_bool, float(s), area))
+            if candidates:
+                _, best_mask_raw, best_score, _ = max(candidates, key=lambda t: t[3])
+            else:
+                best_idx = int(np.argmax(iou_scores))
+                best_mask_raw = masks[best_idx].astype(bool)
+                best_score = float(iou_scores[best_idx])
+            best_mask = clean_mask(best_mask_raw)
+            rows = np.where(np.any(best_mask, axis=1))[0]
+            cols = np.where(np.any(best_mask, axis=0))[0]
+            bx1, by1, bx2, by2 = (int(cols[0]), int(rows[0]), int(cols[-1]), int(rows[-1])) if len(rows) and len(cols) else (0, 0, orig_w, orig_h)
+            all_detections.append({
+                "source": "point",
+                "label": None,
+                "score": round(best_score, 4),
+                "box": {"x1": bx1, "y1": by1, "x2": bx2, "y2": by2},
+                "mask_base64": mask_to_base64(best_mask),
+            })
+
+        if has_box:
+            logger.info(f"[combined] 박스 세그멘테이션: ({x1},{y1},{x2},{y2})")
+            box = np.array([x1, y1, x2, y2], dtype=np.float32)
+            masks, iou_scores, _ = interactive_predictor.predict(
+                box=box,
+                multimask_output=False,
+            )
+            best_idx = int(np.argmax(iou_scores))
+            best_mask = clean_mask(masks[best_idx].astype(bool))
+            best_score = float(iou_scores[best_idx])
+            rows = np.where(np.any(best_mask, axis=1))[0]
+            cols = np.where(np.any(best_mask, axis=0))[0]
+            rx1, ry1, rx2, ry2 = (int(cols[0]), int(rows[0]), int(cols[-1]), int(rows[-1])) if len(rows) and len(cols) else (0, 0, orig_w, orig_h)
+            all_detections.append({
+                "source": "box",
+                "label": None,
+                "score": round(best_score, 4),
+                "box": {"x1": rx1, "y1": ry1, "x2": rx2, "y2": ry2},
+                "mask_base64": mask_to_base64(best_mask),
+            })
+
+        if has_text:
+            prompt_tags = [t.strip() for t in prompt.split(",") if t.strip()]
+            is_empty_prompt = not prompt_tags or prompt.strip() in ("", "object", "auto")
+            if is_empty_prompt:
+                categories = AUTO_CATEGORIES if use_auto else []
+            elif use_auto:
+                seen: set[str] = set()
+                categories = []
+                for t in prompt_tags + AUTO_CATEGORIES:
+                    if t.lower() not in seen:
+                        seen.add(t.lower())
+                        categories.append(t)
+            else:
+                categories = prompt_tags
+            logger.info(f"[combined] 텍스트 세그멘테이션: {len(categories)}개 카테고리")
+            processor.set_confidence_threshold(confidence_threshold)
+            for category in categories:
+                dets = run_inference_with_state(base_state, category, confidence_threshold)
+                for d in dets:
+                    d["source"] = "text"
+                all_detections.extend(dets)
+
+        detections = nms_detections(all_detections, iou_threshold=0.2)
+        logger.info(f"[combined] NMS 전 {len(all_detections)}개 → NMS 후 {len(detections)}개")
+
+    except Exception as e:
+        logger.exception("[combined] 추론 오류")
+        raise HTTPException(status_code=500, detail=f"추론 오류: {e}")
+
+    for i, det in enumerate(detections):
+        det["id"] = i
+
+    return {
+        "image_width": orig_w,
+        "image_height": orig_h,
+        "inputs": {
+            "point": {"x": x, "y": y} if has_point else None,
+            "box": {"x1": x1, "y1": y1, "x2": x2, "y2": y2} if has_box else None,
+            "prompt": prompt.strip() if has_text else None,
+            "use_auto": use_auto,
+        },
+        "num_detections": len(detections),
         "detections": detections,
     }
 
